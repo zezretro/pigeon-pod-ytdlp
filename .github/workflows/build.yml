@@ -61,11 +61,18 @@ jobs:
           tags: smoke-test:local
 
       - name: Smoke test
+        id: smoke
         run: |
           got=$(docker run --rm --entrypoint yt-dlp smoke-test:local --version)
-          echo "yt-dlp in image: $got"
-          [ "$got" = "${{ steps.ytdlp.outputs.version }}" ]
-          docker run --rm --entrypoint sh smoke-test:local -c 'java -version && ffmpeg -version | head -1'
+          want="${{ steps.ytdlp.outputs.version }}"
+          echo "yt-dlp in image: $got (PyPI: $want)"
+          # PyPI drops leading zeros (2026.8.19); yt-dlp prints 2026.08.19
+          norm() { echo "$1" | awk -F. '{for(i=1;i<=NF;i++){$i=$i+0}}1' OFS=.; }
+          if [ "$(norm "$got")" != "$(norm "$want")" ]; then
+            echo "::error::Expected yt-dlp $want but image has $got"; exit 1
+          fi
+          docker run --rm --entrypoint sh smoke-test:local -c 'java -version 2>&1 | head -1 && ffmpeg -version | head -1'
+          echo "version=$got" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -85,8 +92,8 @@ jobs:
             YTDLP_VERSION=${{ steps.ytdlp.outputs.version }}
           tags: |
             ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:ytdlp-${{ steps.ytdlp.outputs.version }}
+            ${{ env.IMAGE }}:ytdlp-${{ steps.smoke.outputs.version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=PigeonPod with an up-to-date yt-dlp
-            io.github.ytdlp.version=${{ steps.ytdlp.outputs.version }}
+            io.github.ytdlp.version=${{ steps.smoke.outputs.version }}
