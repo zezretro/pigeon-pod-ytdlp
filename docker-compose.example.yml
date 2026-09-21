@@ -1,0 +1,5 @@
+# Only the image line changes versus your current setup.
+services:
+  pigeon-pod:
+    image: ghcr.io/zezretro/pigeon-pod:latest
+    # ...keep your existing ports, volumes and environment exactly as they are
