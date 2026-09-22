@@ -13,6 +13,7 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: write   # lets the keepalive job re-enable this workflow
 
 env:
   UPSTREAM_IMAGE: ghcr.io/aizhimou/pigeon-pod:latest
@@ -97,3 +98,15 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=PigeonPod with an up-to-date yt-dlp
             io.github.ytdlp.version=${{ steps.smoke.outputs.version }}
+
+  # GitHub pauses scheduled workflows in public repos after 60 days without
+  # commits. Re-enabling the workflow via the API resets that timer, so the
+  # weekly build keeps running with no dummy commits. Separate job so it runs
+  # even if the build fails.
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset inactivity timer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/build.yml/enable"
